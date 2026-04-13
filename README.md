@@ -1,7 +1,7 @@
 # Night Officer — Voice Agent
 
 Autonomous emergency welfare robot voice system.
-**Stack:** FastAPI · LiveKit Agents · ElevenLabs STT/TTS · Claude (Anthropic)
+**Stack:** FastAPI · LiveKit Agents · ElevenLabs STT/TTS · Groq (Llama 3.3 70B) · Silero VAD · Krisp Noise Cancellation
 
 ---
 
@@ -19,33 +19,22 @@ night-officer/
     ├── main.py             # FastAPI app (uvicorn entry point)
     ├── worker.py           # LiveKit worker (separate process)
     ├── agent/
-    │   ├── __init__.py
     │   ├── night_officer.py   # Agent subclass (on_enter greeting)
-    │   ├── prompts.py         # Bilingual system prompt
-    │   └── session.py         # AgentSession factory
+    │   └── session.py         # AgentSession factory (VAD, STT, LLM, TTS)
     ├── api/
-    │   ├── __init__.py
-    │   ├── middleware/
-    │   │   ├── __init__.py
-    │   │   ├── errors.py      # Global exception handlers
-    │   │   └── logging.py     # Request logging middleware
-    │   └── routes/
-    │       ├── __init__.py
-    │       ├── health.py      # GET /api/v1/health
-    │       └── session.py     # POST /api/v1/session/start
+    │   ├── health.py          # GET /api/v1/health
+    │   └── session.py         # POST /api/v1/session/start
     ├── client/
-    │   ├── __init__.py
-    │   └── livekit.py         # Async token generation
+    │   └── livekit.py         # LiveKit JWT token generation
     ├── core/
-    │   ├── __init__.py
     │   ├── config.py          # Pydantic Settings (reads .env)
+    │   ├── errors.py          # Global exception handlers
     │   ├── exceptions.py      # Domain exception hierarchy
-    │   └── logging.py         # Structured JSON logger
+    │   └── logging.py         # Structured logger (loguru)
     ├── models/
-    │   ├── __init__.py
     │   └── session.py         # Pydantic request/response models
-    └── utils/
-        └── __init__.py        # Pure helpers (phase 2)
+    └── prompts/
+        └── prompts.py         # System prompt + greeting instruction
 ```
 
 ---
@@ -56,7 +45,7 @@ night-officer/
 ```bash
 cp .env.example .env
 # Fill in: LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET,
-#          ANTHROPIC_API_KEY, ELEVEN_API_KEY
+#          GROQ_API_KEY, ELEVEN_API_KEY, ELEVEN_VOICE_ID
 ```
 
 ### 2. Run with Docker Compose
@@ -75,7 +64,7 @@ pip install -r requirements.txt
 uvicorn src.main:app --reload --port 8000
 
 # Terminal 2 — Agent worker (console = local mic/speaker)
-python -m src.worker console   
+python -m src.worker console
 ```
 
 ---
@@ -89,10 +78,22 @@ Robot FSM (TRIAGE state)
 
 LiveKit worker
   → spawns NightOfficerAgent in that room
-  → greets in Korean + English
-  → STT (ElevenLabs Scribe v2) → Claude → TTS (ElevenLabs flash)
-  → bilingual welfare conversation until session ends
+  → greets in English
+  → Noise cancellation (Krisp BVC) → VAD (Silero) → STT (ElevenLabs Scribe v2)
+  → Groq Llama 3.3 70B → TTS (ElevenLabs flash)
+  → welfare conversation until session ends
 ```
+
+---
+
+## Audio pipeline features
+
+| Feature | Implementation |
+|---|---|
+| Noise & echo cancellation | Krisp BVC via `livekit-plugins-noise-cancellation` |
+| Voice activity detection | Silero VAD (tunable thresholds) |
+| Turn detection | MultilingualModel (ML-based end-of-utterance) |
+| Interruption handling | Enabled — user can interrupt agent mid-speech |
 
 ---
 
@@ -100,7 +101,7 @@ LiveKit worker
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 1 | ✅ Current | Agent speaks — STT + Claude + TTS pipeline |
+| 1 | ✅ Current | Agent speaks — STT + LLM + TTS pipeline |
 | 2 | Planned | `dispatch_alert()` and `log_triage_result()` tools |
 | 3 | Planned | MongoDB incident persistence |
 | 4 | Planned | Twilio 119 simulated SMS alert |

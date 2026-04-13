@@ -4,9 +4,8 @@ FROM python:3.11-slim AS builder
 WORKDIR /app
 COPY requirements.txt .
 
-# torch is needed by silero VAD — install CPU-only build to keep image small
-RUN pip install --no-cache-dir --prefix=/install torch --index-url https://download.pytorch.org/whl/cpu && \
-    pip install --no-cache-dir --prefix=/install -r requirements.txt
+# requirements.txt already includes torch CPU via --extra-index-url
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
@@ -22,9 +21,9 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # Pre-download Silero VAD model weights so worker starts without network delay
-RUN python -c "from livekit.plugins import silero; silero.VAD.load()" || true
+RUN python -c "from livekit.plugins import silero; silero.VAD.load()"
 
 USER appuser
 
 # "dev" for hot-reload, "start" for production
-CMD ["python", "worker.py", "start"]
+CMD ["python", "-m", "src.worker", "start"]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 
 from livekit.api import AccessToken, VideoGrants
 
@@ -19,7 +20,7 @@ async def create_room_token(robot_id: str, room_name: str) -> str:
             )
             .with_identity(robot_id)
             .with_name(robot_id)
-            .with_ttl(3600)
+            .with_ttl(timedelta(hours=1))
             .with_grants(
                 VideoGrants(
                     room_join=True,

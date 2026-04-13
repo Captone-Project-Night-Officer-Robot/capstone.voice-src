@@ -1,9 +1,13 @@
+# ── PyTorch (CPU-only — required for MultilingualModel turn detector) ──────────
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+
 # ── Web framework ─────────────────────────────────────────────────────────────
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 
 # ── LiveKit agent + plugins ───────────────────────────────────────────────────
-livekit-agents[openai,elevenlabs,silero,turn-detector]~=1.5.1
+livekit-agents[openai,elevenlabs,silero,turn-detector,noise-cancellation]~=1.5.1
 livekit-api>=0.7.0
 
 # ── Config & validation ───────────────────────────────────────────────────────

@@ -43,5 +43,10 @@ class Settings(BaseSettings):
     agent_max_endpointing_delay: float = 8.0
     agent_allow_interruptions: bool = True
 
+    # ── VAD tuning ────────────────────────────────────────────────────────────
+    vad_activation_threshold: float = 0.6      # higher = less sensitive to noise
+    vad_min_silence_duration: float = 0.3      # seconds of silence before speech ends
+    vad_min_speech_duration: float = 0.1       # minimum speech duration to count
+
 
 settings = Settings()
