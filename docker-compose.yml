@@ -1,0 +1,46 @@
+services:
+
+  # ── FastAPI HTTP server ───────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: night-officer-api:latest
+    container_name: night-officer-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app/src
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - night-officer-net
+
+  # ── LiveKit agent worker ──────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: night-officer-worker:latest
+    container_name: night-officer-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app/src
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - night-officer-net
+
+networks:
+  night-officer-net:
+    driver: bridge
