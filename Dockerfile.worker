@@ -1,0 +1,29 @@
+# ── Stage 1: dependencies ─────────────────────────────────────────────────────
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+COPY requirements.txt .
+
+# requirements.txt already includes torch CPU via --extra-index-url
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# ── Stage 2: runtime ──────────────────────────────────────────────────────────
+FROM python:3.11-slim AS runtime
+
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
+WORKDIR /app
+COPY --from=builder /install /usr/local
+COPY src/ ./src/
+
+ENV PYTHONPATH=/app/src
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Pre-download Silero VAD model weights so worker starts without network delay
+RUN python -c "from livekit.plugins import silero; silero.VAD.load()"
+
+USER appuser
+
+# "dev" for hot-reload, "start" for production
+CMD ["python", "-m", "src.worker", "start"]
