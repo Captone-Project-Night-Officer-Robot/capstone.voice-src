@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # ── ElevenLabs ────────────────────────────────────────────────────────────
     eleven_api_key: str = Field(..., alias="ELEVEN_API_KEY")
-    eleven_tts_model: str = "eleven_flash_v2_5"
+    eleven_tts_model: str = "eleven_multilingual_v2"
     eleven_voice_id: str = Field(..., alias="ELEVEN_VOICE_ID")
     eleven_stt_model: str = "scribe_v2_realtime"
     eleven_stt_language: str = "en"
