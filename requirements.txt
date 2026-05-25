@@ -19,3 +19,10 @@ python-dotenv>=1.0.0
 
 # ── HTTP client (for future tool calls to backend) ────────────────────────────
 httpx>=0.27.0
+
+# ── Optional: laptop-side audio listener (src/listen_local.py) ────────────────
+# Plays TTS audio through the laptop's default output device when the Pi has
+# no speaker. Needs system portaudio first:
+#   macOS:  brew install portaudio
+#   Linux:  sudo apt install libportaudio2
+sounddevice>=0.4.6

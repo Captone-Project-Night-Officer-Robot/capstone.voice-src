@@ -41,3 +41,28 @@ app.add_exception_handler(NightOfficerError, domain_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.include_router(api_router, prefix="/api/v1")
+
+
+def run() -> None:
+    """Run the API bound to settings.host/settings.port.
+
+    Use this so the server is reachable from the Pi (binds 0.0.0.0 by default)
+    instead of having to remember the uvicorn CLI flags.
+    """
+    import uvicorn
+
+    logger.info(
+        f"Starting API on http://{settings.host}:{settings.port}"
+        f" (docs at /docs, health at /api/v1/health)"
+    )
+    uvicorn.run(
+        "src.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=settings.debug,
+        log_level=settings.log_level.lower(),
+    )
+
+
+if __name__ == "__main__":
+    run()
