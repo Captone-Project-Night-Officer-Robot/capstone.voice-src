@@ -26,3 +26,8 @@ httpx>=0.27.0
 #   macOS:  brew install portaudio
 #   Linux:  sudo apt install libportaudio2
 sounddevice>=0.4.6
+
+# ── Twilio (emergency SMS dispatch from NightOfficerAgent.dispatch_emergency)
+# Only needed if you set TWILIO_* env vars; the import is lazy so missing
+# credentials disable the feature gracefully.
+twilio>=8.10.0

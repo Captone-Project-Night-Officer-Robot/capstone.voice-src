@@ -48,9 +48,15 @@ async def start_agent_session(ctx: JobContext) -> None:
         ),
     )
 
+    # Room names are minted as `{robot_id}-{uuid8}` in client/livekit.py, so
+    # everything before the final hyphen segment is the robot id.
+    robot_id = (
+        ctx.room.name.rsplit("-", 1)[0] if "-" in ctx.room.name else ctx.room.name
+    )
+
     await session.start(
         room=ctx.room,
-        agent=NightOfficerAgent(),
+        agent=NightOfficerAgent(robot_id=robot_id),
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
         ),

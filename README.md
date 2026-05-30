@@ -1,7 +1,8 @@
-# Night Officer — Voice Agent
+# Night Officer — Voice Agent + Map Dashboard
 
-Autonomous emergency welfare robot voice system.
-**Stack:** FastAPI · LiveKit Agents · ElevenLabs STT/TTS · Groq (Llama 3.3 70B) · Silero VAD · Krisp Noise Cancellation
+Autonomous emergency welfare robot voice system + live operator map with
+unified log feed and Twilio-based emergency SMS dispatch.
+**Stack:** FastAPI · LiveKit Agents · ElevenLabs STT/TTS · Groq (Llama 3.3 70B) · Silero VAD · Krisp Noise Cancellation · HTML5 Canvas dashboard · Twilio SMS
 
 ---
 
@@ -15,6 +16,8 @@ night-officer/
 ├── pyproject.toml          # Linting, type-check, test config
 ├── requirements.txt
 ├── .env.example            # Copy to .env and fill in keys
+├── static/
+│   └── dashboard.html      # Live robot map (served at /dashboard)
 └── src/
     ├── main.py             # FastAPI app (uvicorn entry point)
     ├── worker.py           # LiveKit worker (separate process)
@@ -23,7 +26,8 @@ night-officer/
     │   └── session.py         # AgentSession factory (VAD, STT, LLM, TTS)
     ├── api/
     │   ├── health.py          # GET /api/v1/health
-    │   └── session.py         # POST /api/v1/session/start
+    │   ├── session.py         # POST /api/v1/session/start
+    │   └── telemetry.py       # pose + fall pins + WebSocket fan-out
     ├── client/
     │   └── livekit.py         # LiveKit JWT token generation
     ├── core/
@@ -32,7 +36,10 @@ night-officer/
     │   ├── exceptions.py      # Domain exception hierarchy
     │   └── logging.py         # Structured logger (loguru)
     ├── models/
-    │   └── session.py         # Pydantic request/response models
+    │   ├── session.py         # Pydantic request/response models
+    │   └── telemetry.py       # PoseUpdate, FallEvent, LogEvent
+    ├── services/
+    │   └── notifier.py        # Twilio SMS dispatch for emergency contact
     └── prompts/
         └── prompts.py         # System prompt + greeting instruction
 ```
@@ -52,8 +59,9 @@ cp .env.example .env
 ```bash
 docker compose up --build
 ```
-- API docs: http://localhost:8000/docs
-- Health:   http://localhost:8000/api/v1/health
+- API docs:  http://localhost:8000/docs
+- Health:    http://localhost:8000/api/v1/health
+- Dashboard: http://localhost:8000/dashboard
 
 ### 3. Local dev (without Docker)
 ```bash
@@ -86,6 +94,87 @@ LiveKit worker
 
 ---
 
+## Map dashboard + live logs
+
+A second feature lives next to the voice agent — a live operator map at
+`/dashboard`, served by the same FastAPI process. The Pi streams its
+estimated pose (5 Hz) and a pin every time YOLO detects a fall. The
+dashboard renders both on an HTML5 Canvas with auto-fitting view,
+state-colored polyline, and a sidebar listing every fall.
+
+A unified **Live Logs** panel merges three sources into one feed:
+- `api` — this FastAPI process (loguru sink → WebSocket)
+- `worker` — the agent worker (loguru sink → HTTP POST → broadcast)
+- `<robot_id>` — Pi-side events (voice start/end, fall confirmation, errors)
+
+```
+                                            ┌──────────────────┐
+   API loguru ───────────► in-proc sink ──► │                  │
+                                            │  ring buffer +   │
+   Worker loguru ──► HTTP /telemetry/log ─► │  WS broadcast    │ ─► /dashboard
+                                            │     (300 max)    │
+   Pi telemetry.emit_log() ─► /telemetry/log│                  │
+                                            └──────────────────┘
+```
+
+The Pi also publishes pose / fall pins via the same channel:
+
+```
+Pi (line_follow --telemetry)
+   │   POST /api/v1/telemetry/pose    (5 Hz)
+   │   POST /api/v1/telemetry/fall    (on YOLO False → True)
+   ▼
+FastAPI (this service)
+   │
+   ▼
+WebSocket /api/v1/telemetry/ws   ──→   browser tabs at /dashboard
+```
+
+No GPS — pose comes from dead-reckoned motor commands on the Pi. See
+`capstone-sensors.src/README.md` for the calibration step.
+
+### Endpoints
+
+```text
+POST /api/v1/telemetry/pose      pose update from Pi
+POST /api/v1/telemetry/fall      fall pin from Pi
+POST /api/v1/telemetry/log       log entry from any source (worker / Pi / scripts)
+GET  /api/v1/telemetry/snapshot  full path + falls + recent logs per robot
+POST /api/v1/telemetry/reset     clear stored state (?robot_id=… optional)
+WS   /api/v1/telemetry/ws        broadcasts updates to dashboards
+GET  /dashboard                  static HTML page (the map + logs)
+```
+
+> Run with `--workers 1` (uvicorn default). State is in-memory and would
+> split across workers otherwise. Persistence (SQLite) is on the
+> roadmap below.
+
+## Emergency SMS dispatch (Twilio)
+
+The `NightOfficerAgent` exposes a `dispatch_emergency` LLM tool that the
+model is instructed (in `src/prompts/prompts.py`, Step 6) to call once it
+has gathered the patient's name, situation, pain, medical history,
+allergies, temperature, and alcohol consumption. The tool sends a single
+formatted SMS to the configured emergency contact, then the agent
+proceeds with the standard Step 6 confirmation lines on-air.
+
+Wire it up in `.env`:
+
+```env
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...          # rotate in the Twilio console if exposed
+TWILIO_FROM_NUMBER=+1...       # your Twilio phone number
+EMERGENCY_PHONE_NUMBER=+82...  # who gets the SMS
+```
+
+Leaving any of these blank disables the feature gracefully — the agent
+still speaks its Step 6 lines and the full patient record is written to
+the worker log (and the dashboard's Live Logs panel) for diagnostic use.
+
+Trial Twilio accounts can only text *verified* numbers — add the
+recipient in **Twilio Console → Phone Numbers → Verified Caller IDs**
+before the demo.
+
 ## Audio pipeline features
 
 | Feature | Implementation |
@@ -102,6 +191,9 @@ LiveKit worker
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 1 | ✅ Current | Agent speaks — STT + LLM + TTS pipeline |
-| 2 | Planned | `dispatch_alert()` and `log_triage_result()` tools |
-| 3 | Planned | MongoDB incident persistence |
-| 4 | Planned | Twilio 119 simulated SMS alert |
+| 2 | ✅ Current | Map dashboard — robot path + fall pins streamed via WebSocket |
+| 3 | ✅ Current | Live Logs panel — API + worker + Pi events merged into one feed |
+| 4 | ✅ Current | `dispatch_emergency` LLM tool — Twilio SMS to emergency contact at Step 6 |
+| 5 | Planned | `log_triage_result()` tool — structured patient record persisted per session |
+| 6 | Planned | SQLite/MongoDB incident persistence (path + falls + transcripts survive restart) |
+| 7 | Planned | Simulated 119 voice call via Twilio Programmable Voice |

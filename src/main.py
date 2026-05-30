@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.api import api_router
+from src.api.telemetry import loguru_broadcast_sink, set_log_loop
 from src.core.config import settings
 from src.core.errors import domain_exception_handler, unhandled_exception_handler
 from src.core.exceptions import NightOfficerError
@@ -15,9 +20,20 @@ from src.core.logging import logger
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Bridge loguru → dashboard WebSocket. enqueue=True moves the sink call
+    # to a background thread so a slow subscriber can't stall handlers.
+    set_log_loop(asyncio.get_running_loop())
+    sink_id = logger.add(
+        loguru_broadcast_sink,
+        level=settings.log_level,
+        enqueue=True,
+    )
     logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-    yield
-    logger.info(f"Shutting down {settings.app_name}")
+    try:
+        yield
+    finally:
+        logger.info(f"Shutting down {settings.app_name}")
+        logger.remove(sink_id)
 
 
 app = FastAPI(
@@ -41,6 +57,25 @@ app.add_exception_handler(NightOfficerError, domain_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
 app.include_router(api_router, prefix="/api/v1")
+
+
+# ── Robot map dashboard ──────────────────────────────────────────────────────
+# Static file lives next to the project root in `static/dashboard.html`. The
+# dashboard subscribes to /api/v1/telemetry/ws and renders the path + fall pins.
+
+_STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+if _STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+
+
+@app.get("/dashboard", include_in_schema=False)
+async def dashboard() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "dashboard.html")
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/dashboard")
 
 
 def run() -> None:
