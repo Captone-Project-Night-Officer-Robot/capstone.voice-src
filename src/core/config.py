@@ -48,5 +48,43 @@ class Settings(BaseSettings):
     vad_min_silence_duration: float = 0.3      # seconds of silence before speech ends
     vad_min_speech_duration: float = 0.1       # minimum speech duration to count
 
+    # ── Twilio (emergency SMS dispatch) ───────────────────────────────────────
+    # When all four are populated, the NightOfficerAgent gains a
+    # `dispatch_emergency` LLM tool that texts collected patient info to the
+    # emergency contact at Step 6 of the screening flow. Leaving any of these
+    # blank disables the tool gracefully — the agent still completes the
+    # conversation, dispatch is just logged instead of sent.
+    twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
+    twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")
+    twilio_from_number: str = Field(default="", alias="TWILIO_FROM_NUMBER")
+    emergency_phone_number: str = Field(default="", alias="EMERGENCY_PHONE_NUMBER")
+
+    @property
+    def twilio_enabled(self) -> bool:
+        return bool(
+            self.twilio_account_sid
+            and self.twilio_auth_token
+            and self.twilio_from_number
+            and self.emergency_phone_number
+        )
+
+    # ── Emergency outbound call (LiveKit SIP → Twilio trunk) ──────────────────
+    # After the NightOfficer conversation ends, a second agent places a real
+    # phone call to the emergency contact and reports the patient record.
+    # Needs the LiveKit outbound trunk id from scripts/create_sip_trunk.py.
+    livekit_sip_outbound_trunk_id: str = Field(
+        default="", alias="LIVEKIT_SIP_OUTBOUND_TRUNK_ID"
+    )
+    emergency_call_enabled: bool = Field(default=True, alias="EMERGENCY_CALL_ENABLED")
+
+    @property
+    def emergency_call_ready(self) -> bool:
+        """True when an outbound emergency call can actually be placed."""
+        return bool(
+            self.emergency_call_enabled
+            and self.livekit_sip_outbound_trunk_id
+            and self.emergency_phone_number
+        )
+
 
 settings = Settings()

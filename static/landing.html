@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE NIGHT OFFICER — Quantum Guard</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cyan:    #00E5FF;
+  --cyan2:   #00b8cc;
+  --cyan-dim:#005060;
+  --red:     #ff3a3a;
+  --green:   #39ff14;
+  --gold:    #ffc940;
+  --bg:      #020810;
+  --bg2:     #040d18;
+  --panel:   #071422;
+  --steel:   #0d2035;
+  --text:    #c8e8f0;
+  --text-dim:#4a7a88;
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 17px;
+  overflow-x: hidden;
+  cursor: crosshair;
+}
+
+/* ── SCANLINE OVERLAY ── */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 3px,
+    rgba(0,229,255,0.012) 3px, rgba(0,229,255,0.012) 4px
+  );
+  pointer-events:none; z-index:9999;
+}
+
+/* ── NOISE TEXTURE ── */
+body::after {
+  content:'';
+  position:fixed; inset:0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:9998; opacity:0.4;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed; top:0; left:0; right:0; z-index:1000;
+  display: flex; align-items:center; justify-content:space-between;
+  padding: 0 4rem;
+  height: 64px;
+  background: rgba(2,8,16,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0,229,255,0.12);
+}
+
+.nav-logo {
+  font-family:'Orbitron',monospace;
+  font-size:13px; font-weight:700;
+  letter-spacing:4px;
+  color: var(--cyan);
+  text-shadow: 0 0 20px rgba(0,229,255,0.5);
+}
+
+.nav-links {
+  display:flex; gap:2.5rem; list-style:none;
+}
+.nav-links a {
+  font-family:'Share Tech Mono',monospace;
+  font-size:11px; letter-spacing:2px;
+  color: var(--text-dim);
+  text-decoration:none; text-transform:uppercase;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--cyan); }
+.nav-links a.nav-live {
+  color: var(--green);
+  border: 1px solid var(--green);
+  padding: 5px 12px; border-radius: 2px;
+}
+.nav-links a.nav-live:hover {
+  color: var(--bg); background: var(--green);
+}
+
+.nav-tag {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:2px;
+  color: var(--cyan-dim);
+  border: 1px solid var(--cyan-dim);
+  padding: 4px 12px; border-radius:2px;
+}
+
+/* ── HERO ── */
+#hero {
+  min-height: 100vh;
+  display: flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  position: relative;
+  overflow: hidden;
+  padding: 80px 2rem 2rem;
+}
+
+.hero-grid {
+  position:absolute; inset:0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black, transparent);
+}
+
+.hero-glow {
+  position:absolute;
+  width:800px; height:800px;
+  background: radial-gradient(ellipse, rgba(0,229,255,0.07) 0%, transparent 70%);
+  top:50%; left:50%; transform:translate(-50%,-55%);
+  pointer-events:none;
+}
+
+.hero-badge {
+  font-family:'Share Tech Mono',monospace;
+  font-size:11px; letter-spacing:4px;
+  color: var(--cyan);
+  border: 1px solid rgba(0,229,255,0.3);
+  padding:6px 20px; margin-bottom:2rem;
+  position:relative;
+  animation: fadeUp 0.8s ease both;
+}
+.hero-badge::before, .hero-badge::after {
+  content:'◈'; position:absolute; top:50%; transform:translateY(-50%);
+  color: var(--cyan); font-size:8px;
+}
+.hero-badge::before { left:-16px; }
+.hero-badge::after  { right:-16px; }
+
+.hero-title {
+  font-family:'Orbitron',monospace;
+  font-size: clamp(48px,8vw,100px);
+  font-weight:900; line-height:0.9;
+  letter-spacing:-2px;
+  text-align:center;
+  color:#fff;
+  text-shadow: 0 0 60px rgba(0,229,255,0.3), 0 0 120px rgba(0,229,255,0.1);
+  animation: fadeUp 0.9s ease 0.1s both;
+  position:relative; z-index:1;
+}
+
+.hero-title span {
+  display:block;
+  -webkit-text-stroke: 1px rgba(0,229,255,0.4);
+  color: transparent;
+}
+
+.hero-sub {
+  font-family:'Share Tech Mono',monospace;
+  font-size: clamp(11px,1.5vw,14px);
+  letter-spacing:5px; color: var(--text-dim);
+  margin-top:1.5rem; text-transform:uppercase;
+  text-align:center;
+  animation: fadeUp 1s ease 0.2s both;
+}
+
+.hero-desc {
+  max-width:600px; text-align:center;
+  font-size:18px; line-height:1.7;
+  color:rgba(200,232,240,0.7);
+  margin-top:1.8rem;
+  animation: fadeUp 1s ease 0.3s both;
+}
+
+.hero-cta {
+  display:flex; gap:1rem; margin-top:3rem;
+  animation: fadeUp 1s ease 0.4s both;
+}
+
+.btn-primary {
+  font-family:'Share Tech Mono',monospace;
+  font-size:12px; letter-spacing:3px;
+  color: var(--bg); background: var(--cyan);
+  border:none; padding:14px 32px;
+  text-decoration:none; text-transform:uppercase;
+  clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  transition: all 0.2s;
+  cursor:pointer;
+}
+.btn-primary:hover {
+  background:#fff;
+  box-shadow: 0 0 30px rgba(0,229,255,0.6);
+}
+
+.btn-secondary {
+  font-family:'Share Tech Mono',monospace;
+  font-size:12px; letter-spacing:3px;
+  color: var(--cyan); background:transparent;
+  border:1px solid rgba(0,229,255,0.4);
+  padding:14px 32px; text-decoration:none; text-transform:uppercase;
+  transition: all 0.2s; cursor:pointer;
+}
+.btn-secondary:hover {
+  background: rgba(0,229,255,0.08);
+  border-color: var(--cyan);
+}
+
+/* Hero stats */
+.hero-stats {
+  display:flex; gap:4rem; margin-top:5rem;
+  border-top:1px solid rgba(0,229,255,0.1);
+  padding-top:2.5rem;
+  animation: fadeUp 1s ease 0.5s both;
+}
+.stat { text-align:center; }
+.stat-val {
+  font-family:'Orbitron',monospace;
+  font-size:32px; font-weight:700;
+  color: var(--cyan);
+  text-shadow: 0 0 20px rgba(0,229,255,0.4);
+}
+.stat-label {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:3px;
+  color: var(--text-dim); margin-top:4px;
+}
+
+/* Scroll indicator */
+.scroll-ind {
+  position:absolute; bottom:2rem; left:50%; transform:translateX(-50%);
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  animation: fadeUp 1s ease 0.8s both;
+}
+.scroll-ind span {
+  font-family:'Share Tech Mono',monospace;
+  font-size:9px; letter-spacing:3px; color:var(--text-dim);
+}
+.scroll-arrow {
+  width:1px; height:40px;
+  background: linear-gradient(var(--cyan), transparent);
+  animation: scrollPulse 2s ease-in-out infinite;
+}
+
+/* ── SECTION BASE ── */
+section { padding: 8rem 2rem; position:relative; }
+.container { max-width:1200px; margin:0 auto; }
+
+.section-label {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:5px; color:var(--cyan);
+  text-transform:uppercase; margin-bottom:1rem;
+  display:flex; align-items:center; gap:12px;
+}
+.section-label::before {
+  content:''; display:block;
+  width:30px; height:1px; background:var(--cyan);
+}
+
+.section-title {
+  font-family:'Orbitron',monospace;
+  font-size: clamp(28px,4vw,48px);
+  font-weight:700; line-height:1.1;
+  color:#fff; margin-bottom:1.5rem;
+}
+
+/* ── ABOUT ── */
+#about { background: var(--bg2); }
+
+.about-grid {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:5rem; align-items:center;
+}
+
+.about-text p {
+  font-size:17px; line-height:1.8;
+  color:rgba(200,232,240,0.75);
+  margin-bottom:1rem;
+}
+
+.about-card {
+  background: var(--panel);
+  border:1px solid rgba(0,229,255,0.12);
+  border-radius:4px; padding:2.5rem;
+  position:relative; overflow:hidden;
+}
+.about-card::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+}
+
+.project-info { display:flex; flex-direction:column; gap:1rem; }
+.info-row {
+  display:flex; justify-content:space-between;
+  padding:0.75rem 0;
+  border-bottom:1px solid rgba(0,229,255,0.07);
+  font-size:14px;
+}
+.info-key {
+  font-family:'Share Tech Mono',monospace;
+  font-size:11px; letter-spacing:2px; color:var(--text-dim);
+}
+.info-val { color:var(--cyan); font-weight:600; }
+
+/* ── FEATURES ── */
+#features { background:var(--bg); }
+
+.features-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:1.5px; margin-top:4rem;
+  background: rgba(0,229,255,0.08);
+  border:1px solid rgba(0,229,255,0.08);
+}
+
+.feature-card {
+  background:var(--bg); padding:2.5rem;
+  position:relative; overflow:hidden;
+  transition: background 0.3s;
+}
+.feature-card:hover { background: var(--panel); }
+.feature-card::after {
+  content:''; position:absolute; inset:0;
+  background: radial-gradient(ellipse at 30% 30%, rgba(0,229,255,0.04), transparent 60%);
+  opacity:0; transition:opacity 0.3s;
+}
+.feature-card:hover::after { opacity:1; }
+
+.feature-icon {
+  font-size:28px; margin-bottom:1.5rem;
+  display:block;
+}
+.feature-name {
+  font-family:'Orbitron',monospace;
+  font-size:13px; font-weight:700; letter-spacing:2px;
+  color: var(--cyan); margin-bottom:0.75rem;
+}
+.feature-desc {
+  font-size:15px; line-height:1.7;
+  color:rgba(200,232,240,0.65);
+}
+.feature-tag {
+  display:inline-block; margin-top:1rem;
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:2px;
+  color:var(--text-dim);
+  border:1px solid rgba(0,229,255,0.15);
+  padding:3px 10px;
+}
+
+/* ── SPECS ── */
+#specs { background:var(--bg2); }
+
+.specs-layout {
+  display:grid; grid-template-columns:1fr 1.2fr;
+  gap:5rem; align-items:start; margin-top:4rem;
+}
+
+.spec-group { margin-bottom:3rem; }
+.spec-group-title {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:4px;
+  color:var(--cyan); margin-bottom:1rem;
+  padding-bottom:0.5rem;
+  border-bottom:1px solid rgba(0,229,255,0.15);
+}
+
+.spec-item {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:0.65rem 0;
+  border-bottom:1px solid rgba(0,229,255,0.05);
+  font-size:15px;
+}
+.spec-item:last-child { border-bottom:none; }
+.spec-k { color:var(--text-dim); font-size:14px; }
+.spec-v { color:#fff; font-weight:600; text-align:right; }
+
+/* Cover diagram */
+.cover-diagram {
+  background:var(--panel);
+  border:1px solid rgba(0,229,255,0.12);
+  border-radius:4px; padding:2rem;
+  position:relative;
+}
+.cover-diagram svg { width:100%; height:auto; }
+
+/* ── TEAM ── */
+#team { background:var(--bg); }
+
+.team-grid {
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:1rem; margin-top:4rem;
+}
+
+.member-card {
+  background:var(--panel);
+  border:1px solid rgba(0,229,255,0.1);
+  padding:1.8rem 1.5rem;
+  position:relative; overflow:hidden;
+  transition: transform 0.3s, border-color 0.3s;
+}
+.member-card:hover {
+  transform: translateY(-4px);
+  border-color:rgba(0,229,255,0.4);
+}
+.member-card::before {
+  content:''; position:absolute;
+  top:0; left:0; right:0; height:1px;
+  background: linear-gradient(90deg,transparent,var(--cyan),transparent);
+  transform:scaleX(0); transition:transform 0.3s;
+}
+.member-card:hover::before { transform:scaleX(1); }
+
+.member-avatar {
+  width:48px; height:48px;
+  background: linear-gradient(135deg, var(--cyan-dim), var(--steel));
+  border:1px solid rgba(0,229,255,0.3);
+  border-radius:2px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Orbitron',monospace;
+  font-size:16px; font-weight:700; color:var(--cyan);
+  margin-bottom:1rem;
+}
+.member-name {
+  font-family:'Orbitron',monospace;
+  font-size:12px; font-weight:700; letter-spacing:1px;
+  color:#fff; margin-bottom:0.4rem;
+}
+.member-role {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:1px;
+  color:var(--cyan); margin-bottom:0.75rem;
+}
+.member-dept {
+  display:inline-block;
+  font-family:'Share Tech Mono',monospace;
+  font-size:9px; letter-spacing:2px;
+  padding:2px 8px;
+  border:1px solid rgba(0,229,255,0.2);
+  color:var(--text-dim);
+}
+.member-you { border-color:rgba(0,229,255,0.5); background:rgba(0,229,255,0.04); }
+.member-you .member-dept { border-color:var(--cyan); color:var(--cyan); }
+
+/* ── TIMELINE ── */
+#timeline { background:var(--bg2); }
+
+.timeline {
+  position:relative; margin-top:4rem;
+  padding-left:3rem;
+}
+.timeline::before {
+  content:''; position:absolute;
+  left:0; top:0; bottom:0; width:1px;
+  background: linear-gradient(var(--cyan), rgba(0,229,255,0.1));
+}
+
+.tl-item {
+  position:relative; margin-bottom:3rem;
+  opacity:0; transform:translateX(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.tl-item.visible { opacity:1; transform:translateX(0); }
+
+.tl-dot {
+  position:absolute; left:-3.45rem; top:4px;
+  width:10px; height:10px;
+  background:var(--cyan);
+  border:2px solid var(--bg2);
+  box-shadow:0 0 12px var(--cyan);
+}
+.tl-date {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:3px;
+  color:var(--cyan); margin-bottom:0.5rem;
+}
+.tl-title {
+  font-family:'Orbitron',monospace;
+  font-size:15px; font-weight:700; color:#fff;
+  margin-bottom:0.5rem;
+}
+.tl-desc {
+  font-size:15px; line-height:1.7;
+  color:rgba(200,232,240,0.65);
+}
+
+/* ── FOOTER ── */
+footer {
+  background:var(--bg);
+  border-top:1px solid rgba(0,229,255,0.1);
+  padding:4rem 2rem 2rem;
+  text-align:center;
+}
+.footer-logo {
+  font-family:'Orbitron',monospace;
+  font-size:20px; font-weight:900; letter-spacing:6px;
+  color:var(--cyan);
+  text-shadow:0 0 30px rgba(0,229,255,0.4);
+  margin-bottom:1rem;
+}
+.footer-sub {
+  font-family:'Share Tech Mono',monospace;
+  font-size:11px; letter-spacing:3px;
+  color:var(--text-dim); margin-bottom:3rem;
+}
+.footer-links {
+  display:flex; justify-content:center; gap:3rem;
+  list-style:none; margin-bottom:3rem;
+}
+.footer-links a {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:2px;
+  color:var(--text-dim); text-decoration:none; text-transform:uppercase;
+  transition:color 0.2s;
+}
+.footer-links a:hover { color:var(--cyan); }
+.footer-copy {
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:2px; color:var(--cyan-dim);
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(24px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+@keyframes scrollPulse {
+  0%,100% { opacity:1; transform:scaleY(1); }
+  50%      { opacity:0.3; transform:scaleY(0.6); }
+}
+@keyframes blink {
+  0%,100% { opacity:1; } 50% { opacity:0; }
+}
+@keyframes pulse {
+  0%,100% { opacity:1; } 50% { opacity:0.3; }
+}
+@keyframes rotate {
+  from { transform:rotate(0deg); }
+  to   { transform:rotate(360deg); }
+}
+
+/* Reveal on scroll */
+.reveal {
+  opacity:0; transform:translateY(32px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible { opacity:1; transform:translateY(0); }
+
+/* corner brackets on sections */
+.bracketed {
+  position:relative;
+}
+.bracketed::before, .bracketed::after {
+  content:'';
+  position:absolute;
+  width:20px; height:20px;
+  border-color:rgba(0,229,255,0.3);
+  border-style:solid;
+}
+.bracketed::before { top:0; left:0; border-width:1px 0 0 1px; }
+.bracketed::after  { bottom:0; right:0; border-width:0 1px 1px 0; }
+
+/* ── ROBOT VISUAL ── */
+.robot-visual {
+  display:flex; justify-content:center; align-items:center;
+  margin:4rem 0;
+}
+
+.robot-svg-wrap {
+  position:relative; width:400px; height:400px;
+}
+
+/* Spinning ring */
+.spin-ring {
+  position:absolute; inset:0;
+  border:1px solid rgba(0,229,255,0.15);
+  border-radius:50%;
+  animation:rotate 20s linear infinite;
+}
+.spin-ring-2 {
+  position:absolute; inset:30px;
+  border:1px dashed rgba(0,229,255,0.08);
+  border-radius:50%;
+  animation:rotate 14s linear infinite reverse;
+}
+
+/* Glowing center */
+.robot-center {
+  position:absolute; inset:60px;
+  background: radial-gradient(ellipse, rgba(0,229,255,0.06) 0%, transparent 70%);
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* Tick marks on ring */
+.tick {
+  position:absolute; width:100%; height:100%; top:0; left:0;
+}
+
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">NIGHT OFFICER</div>
+  <ul class="nav-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#specs">Specs</a></li>
+    <li><a href="#team">Team</a></li>
+    <li><a href="#timeline">Timeline</a></li>
+    <li><a href="/app" class="nav-live">◉ Live Dashboard</a></li>
+  </ul>
+  <div class="nav-tag">CAPSTONE 2026</div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+
+  <div class="hero-badge">QUANTUM GUARD · TEAM 2 · INHA UNIVERSITY</div>
+
+  <h1 class="hero-title">
+    THE NIGHT
+    <span>OFFICER</span>
+  </h1>
+
+  <p class="hero-sub">Autonomous Security Patrol Robot &nbsp;·&nbsp; ISE / IBT Capstone Design 2026</p>
+
+  <p class="hero-desc">
+    An autonomous night-patrol welfare robot that detects falls with computer vision,
+    talks to the fallen person in English and Korean, and dispatches emergency help
+    automatically — all streamed live to a real-time dashboard.
+  </p>
+
+  <div class="hero-cta">
+    <a href="/app" class="btn-primary">◉ Live Mission Control</a>
+    <a href="#features" class="btn-secondary">View Features</a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="stat">
+      <div class="stat-val">YOLO26n</div>
+      <div class="stat-label">Fall Detection</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">EN · KR</div>
+      <div class="stat-label">Bilingual AI Voice</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">119</div>
+      <div class="stat-label">Auto Emergency Call</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">8</div>
+      <div class="stat-label">Team Members</div>
+    </div>
+  </div>
+
+  <div class="scroll-ind">
+    <span>SCROLL</span>
+    <div class="scroll-arrow"></div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about">
+  <div class="container">
+    <div class="about-grid">
+      <div class="about-text reveal">
+        <div class="section-label">01 &nbsp;—&nbsp; ABOUT</div>
+        <h2 class="section-title">Autonomous Security<br>for the Modern Era</h2>
+        <p>
+          The Night Officer is an autonomous night-patrol welfare robot. Built on a
+          Yahboom four-wheel-drive chassis with a Raspberry&nbsp;Pi&nbsp;4 brain, it
+          patrols indoor spaces, watches for people who have fallen, and stays with
+          them until human help arrives.
+        </p>
+        <p>
+          When its YOLO26n vision model confirms a fall, the robot stops, drops a pin
+          on the live map, and a conversational AI agent speaks with the person in
+          English and Korean — calmly gathering their name, injuries, and condition.
+        </p>
+        <p>
+          It then dispatches help automatically: an outbound emergency call and SMS
+          relay the patient's details to the medical team. The whole patrol streams
+          live to a real-time mission-control dashboard — all inside a custom
+          3D-printed shell designed and fabricated by our team.
+        </p>
+      </div>
+
+      <div class="about-card reveal bracketed" style="transition-delay:0.2s">
+        <div class="project-info">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:3px;color:var(--cyan);margin-bottom:1.5rem;">PROJECT INFORMATION</div>
+          <div class="info-row"><span class="info-key">COURSE</span><span class="info-val">Capstone Design</span></div>
+          <div class="info-row"><span class="info-key">DEPT</span><span class="info-val">ISE + IBT</span></div>
+          <div class="info-row"><span class="info-key">TEAM</span><span class="info-val">Quantum Guard · #2</span></div>
+          <div class="info-row"><span class="info-key">PLATFORM</span><span class="info-val">Yahboom Pi4WD</span></div>
+          <div class="info-row"><span class="info-key">BRAIN</span><span class="info-val">Raspberry Pi 4B</span></div>
+          <div class="info-row"><span class="info-key">VISION</span><span class="info-val">YOLO26n · Fall</span></div>
+          <div class="info-row"><span class="info-key">VOICE</span><span class="info-val">LiveKit · ElevenLabs</span></div>
+          <div class="info-row"><span class="info-key">LLM</span><span class="info-val">Groq Llama 3.3</span></div>
+          <div class="info-row"><span class="info-key">DISPATCH</span><span class="info-val">Twilio · 119</span></div>
+          <div class="info-row"><span class="info-key">SHELL</span><span class="info-val">3D Printed · Fusion 360</span></div>
+          <div class="info-row"><span class="info-key">YEAR</span><span class="info-val">2026</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">02 &nbsp;—&nbsp; CAPABILITIES</div>
+      <h2 class="section-title">What The Night Officer Can Do</h2>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card reveal" style="transition-delay:0.05s">
+        <span class="feature-icon">👁</span>
+        <div class="feature-name">FALL DETECTION</div>
+        <p class="feature-desc">A YOLO26n vision model running on a remote inference server spots when a person has fallen, with a verification window to reject false alarms before acting.</p>
+        <span class="feature-tag">YOLO26n · REAL-TIME</span>
+      </div>
+      <div class="feature-card reveal" style="transition-delay:0.10s">
+        <span class="feature-icon">🗣</span>
+        <div class="feature-name">AI VOICE COMPANION</div>
+        <p class="feature-desc">On a confirmed fall, a conversational agent speaks with the person in English and Korean — gathering their name, injuries, and condition while keeping them calm.</p>
+        <span class="feature-tag">LIVEKIT · ELEVENLABS · GROQ</span>
+      </div>
+      <div class="feature-card reveal" style="transition-delay:0.15s">
+        <span class="feature-icon">📞</span>
+        <div class="feature-name">EMERGENCY 119 DISPATCH</div>
+        <p class="feature-desc">The robot places an autonomous outbound phone call and SMS, relaying the patient's details and location to the medical team — no human in the loop.</p>
+        <span class="feature-tag">TWILIO · SIP · SMS</span>
+      </div>
+      <div class="feature-card reveal" style="transition-delay:0.20s">
+        <span class="feature-icon">🧭</span>
+        <div class="feature-name">AUTONOMOUS NAVIGATION</div>
+        <p class="feature-desc">White-line tracking with PID steering keeps the robot on its patrol route, while dual ultrasonic sensors stop and steer it around obstacles.</p>
+        <span class="feature-tag">LINE-FOLLOW · ULTRASONIC ×2</span>
+      </div>
+      <div class="feature-card reveal" style="transition-delay:0.25s">
+        <span class="feature-icon">📊</span>
+        <div class="feature-name">LIVE MISSION CONTROL</div>
+        <p class="feature-desc">A real-time web dashboard streams the camera feeds, a live map of the patrol path and fall pins, the voice transcript, and the emergency-call status.</p>
+        <span class="feature-tag">FASTAPI · REACT · WEBSOCKET</span>
+      </div>
+      <div class="feature-card reveal" style="transition-delay:0.30s">
+        <span class="feature-icon">🛡</span>
+        <div class="feature-name">FUTURISTIC SHELL</div>
+        <p class="feature-desc">Custom 3D-printed two-piece enclosure designed in Fusion 360. Matte black shell with sensor cutouts and engraved team branding.</p>
+        <span class="feature-tag">239×144×163mm · PLA</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SPECS -->
+<section id="specs">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">03 &nbsp;—&nbsp; SPECIFICATIONS</div>
+      <h2 class="section-title">Technical Details</h2>
+    </div>
+
+    <div class="specs-layout">
+      <div class="reveal" style="transition-delay:0.1s">
+        <div class="spec-group">
+          <div class="spec-group-title">HARDWARE</div>
+          <div class="spec-item"><span class="spec-k">Chassis</span><span class="spec-v">Yahboom Pi 4WD</span></div>
+          <div class="spec-item"><span class="spec-k">Processor</span><span class="spec-v">Raspberry Pi 4B</span></div>
+          <div class="spec-item"><span class="spec-k">Cameras</span><span class="spec-v">Pi Cam + USB Cam</span></div>
+          <div class="spec-item"><span class="spec-k">Proximity</span><span class="spec-v">Ultrasonic ×2</span></div>
+          <div class="spec-item"><span class="spec-k">Audio I/O</span><span class="spec-v">USB Mic + Speaker</span></div>
+          <div class="spec-item"><span class="spec-k">Drive</span><span class="spec-v">4× DC · I²C Driver</span></div>
+        </div>
+
+        <div class="spec-group">
+          <div class="spec-group-title">SOFTWARE</div>
+          <div class="spec-item"><span class="spec-k">Vision</span><span class="spec-v">YOLO26n · Fall</span></div>
+          <div class="spec-item"><span class="spec-k">Voice</span><span class="spec-v">LiveKit Agents</span></div>
+          <div class="spec-item"><span class="spec-k">Speech</span><span class="spec-v">ElevenLabs STT/TTS</span></div>
+          <div class="spec-item"><span class="spec-k">LLM</span><span class="spec-v">Groq Llama 3.3 70B</span></div>
+          <div class="spec-item"><span class="spec-k">Dispatch</span><span class="spec-v">Twilio · 119 Call</span></div>
+          <div class="spec-item"><span class="spec-k">Dashboard</span><span class="spec-v">FastAPI + React</span></div>
+          <div class="spec-item"><span class="spec-k">Language</span><span class="spec-v">Python · EN/KR</span></div>
+        </div>
+
+        <div class="spec-group">
+          <div class="spec-group-title">3D PRINTED COVER</div>
+          <div class="spec-item"><span class="spec-k">Parts</span><span class="spec-v">F_Upper + F_Lower</span></div>
+          <div class="spec-item"><span class="spec-k">Width</span><span class="spec-v">239.5 mm</span></div>
+          <div class="spec-item"><span class="spec-k">Depth</span><span class="spec-v">144.3 mm</span></div>
+          <div class="spec-item"><span class="spec-k">Total Height</span><span class="spec-v">163.5 mm</span></div>
+          <div class="spec-item"><span class="spec-k">Upper Height</span><span class="spec-v">48.6 mm</span></div>
+          <div class="spec-item"><span class="spec-k">Lower Height</span><span class="spec-v">80.9 mm</span></div>
+          <div class="spec-item"><span class="spec-k">Material</span><span class="spec-v">PLA / PETG</span></div>
+          <div class="spec-item"><span class="spec-k">Color</span><span class="spec-v">Matte Black</span></div>
+          <div class="spec-item"><span class="spec-k">CAD</span><span class="spec-v">Fusion 360</span></div>
+          <div class="spec-item"><span class="spec-k">Engraving</span><span class="spec-v">QUANTUM GUARD</span></div>
+        </div>
+      </div>
+
+      <!-- Cover SVG diagram -->
+      <div class="cover-diagram reveal bracketed" style="transition-delay:0.2s">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--cyan);margin-bottom:1.5rem;">COVER SHELL · CROSS SECTION</div>
+        <svg viewBox="0 0 320 420" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#0d2035"/>
+              <stop offset="100%" stop-color="#040c18"/>
+            </linearGradient>
+            <linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#102840"/>
+              <stop offset="100%" stop-color="#060f20"/>
+            </linearGradient>
+            <filter id="glow2">
+              <feGaussianBlur stdDeviation="2" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- UPPER PART -->
+          <path d="M60,40 L260,40 L275,58 L275,148 L260,162 L60,162 L45,148 L45,58 Z"
+                fill="url(#lg2)" stroke="#00E5FF" stroke-width="1.5" opacity="0.9"/>
+          <!-- upper top cap -->
+          <path d="M80,40 L240,40 L250,20 L70,20 Z"
+                fill="#0e2030" stroke="#00E5FF" stroke-width="1" opacity="0.7"/>
+          <!-- camera hole -->
+          <ellipse cx="160" cy="100" rx="32" ry="32"
+                   fill="#020810" stroke="#00E5FF" stroke-width="1.5"/>
+          <ellipse cx="160" cy="100" rx="20" ry="20"
+                   fill="#020810" stroke="rgba(0,229,255,0.4)" stroke-width="1"/>
+          <ellipse cx="160" cy="100" rx="8" ry="8"
+                   fill="#00E5FF" opacity="0.2">
+            <animate attributeName="opacity" values="0.2;0.6;0.2" dur="2s" repeatCount="indefinite"/>
+          </ellipse>
+          <!-- upper label -->
+          <text x="160" y="155" text-anchor="middle" font-size="8" fill="rgba(0,229,255,0.5)"
+                font-family="Share Tech Mono, monospace" letter-spacing="2">F_UPPER · 48.6mm</text>
+
+          <!-- GAP indicator -->
+          <line x1="45" y1="172" x2="275" y2="172" stroke="rgba(0,229,255,0.2)" stroke-width="1" stroke-dasharray="4,4"/>
+          <line x1="45" y1="218" x2="275" y2="218" stroke="rgba(0,229,255,0.2)" stroke-width="1" stroke-dasharray="4,4"/>
+          <text x="295" y="200" font-size="8" fill="rgba(0,229,255,0.4)"
+                font-family="Share Tech Mono,monospace">33.4mm GAP</text>
+          <line x1="280" y1="172" x2="280" y2="218" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>
+          <line x1="276" y1="172" x2="284" y2="172" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>
+          <line x1="276" y1="218" x2="284" y2="218" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>
+
+          <!-- LOWER PART -->
+          <path d="M40,228 L280,228 L295,248 L295,368 L280,384 L40,384 L25,368 L25,248 Z"
+                fill="url(#lg1)" stroke="#00E5FF" stroke-width="1.5" opacity="0.9"/>
+          <!-- panel lines -->
+          <line x1="60" y1="228" x2="60" y2="384" stroke="rgba(0,229,255,0.12)" stroke-width="1"/>
+          <line x1="260" y1="228" x2="260" y2="384" stroke="rgba(0,229,255,0.12)" stroke-width="1"/>
+          <line x1="25" y1="300" x2="295" y2="300" stroke="rgba(0,229,255,0.1)" stroke-width="1"/>
+          <!-- ultrasonic holes -->
+          <circle cx="110" cy="265" r="16" fill="#020810" stroke="#00E5FF" stroke-width="1.5"/>
+          <circle cx="110" cy="265" r="9" fill="#020810" stroke="rgba(0,229,255,0.4)" stroke-width="1"/>
+          <circle cx="110" cy="265" r="4" fill="#00E5FF" opacity="0.4">
+            <animate attributeName="opacity" values="0.4;0.9;0.4" dur="1.5s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="210" cy="265" r="16" fill="#020810" stroke="#00E5FF" stroke-width="1.5"/>
+          <circle cx="210" cy="265" r="9" fill="#020810" stroke="rgba(0,229,255,0.4)" stroke-width="1"/>
+          <circle cx="210" cy="265" r="4" fill="#00E5FF" opacity="0.4">
+            <animate attributeName="opacity" values="0.4;0.9;0.4" dur="1.5s" begin="0.3s" repeatCount="indefinite"/>
+          </circle>
+          <!-- alcohol grille -->
+          <rect x="38" y="330" width="30" height="24" fill="#020810" stroke="rgba(57,255,20,0.5)" stroke-width="1"/>
+          <line x1="42" y1="335" x2="65" y2="335" stroke="rgba(57,255,20,0.4)" stroke-width="0.8"/>
+          <line x1="42" y1="340" x2="65" y2="340" stroke="rgba(57,255,20,0.4)" stroke-width="0.8"/>
+          <line x1="42" y1="345" x2="65" y2="345" stroke="rgba(57,255,20,0.4)" stroke-width="0.8"/>
+          <line x1="42" y1="350" x2="65" y2="350" stroke="rgba(57,255,20,0.4)" stroke-width="0.8"/>
+          <!-- quantum guard text -->
+          <text x="160" y="360" text-anchor="middle" font-size="9" fill="rgba(0,229,255,0.6)"
+                font-family="Share Tech Mono,monospace" letter-spacing="3">QUANTUM GUARD</text>
+          <!-- lower label -->
+          <text x="160" y="378" text-anchor="middle" font-size="8" fill="rgba(0,229,255,0.5)"
+                font-family="Share Tech Mono,monospace" letter-spacing="2">F_LOWER · 80.9mm</text>
+
+          <!-- LED strip glow bottom -->
+          <line x1="40" y1="383" x2="280" y2="383" stroke="#00E5FF" stroke-width="2.5" opacity="0.7" filter="url(#glow2)"/>
+
+          <!-- total height dimension -->
+          <line x1="10" y1="20" x2="10" y2="384" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>
+          <line x1="6" y1="20" x2="14" y2="20" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>
+          <line x1="6" y1="384" x2="14" y2="384" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>
+          <text x="2" y="206" font-size="8" fill="rgba(0,229,255,0.5)"
+                font-family="Share Tech Mono,monospace"
+                transform="rotate(-90,2,206)">163.5mm TOTAL</text>
+
+          <!-- Scan line animation -->
+          <rect x="26" y="229" width="268" height="2" fill="rgba(0,229,255,0.3)">
+            <animateTransform attributeName="transform" type="translate"
+                              from="0,0" to="0,154" dur="3s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0.6;0" dur="3s" repeatCount="indefinite"/>
+          </rect>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TEAM -->
+<section id="team">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">04 &nbsp;—&nbsp; THE TEAM</div>
+      <h2 class="section-title">Quantum Guard · Team 2</h2>
+      <p style="color:rgba(200,232,240,0.6);max-width:500px;margin-top:1rem;font-size:16px;line-height:1.7;">
+        A cross-disciplinary team of ISE engineers and IBT business students from Inha University, 
+        working together to bring The Night Officer to life.
+      </p>
+    </div>
+
+    <div class="team-grid" style="margin-top:3rem;">
+      <div class="member-card reveal" style="transition-delay:0.05s">
+        <div class="member-avatar">L</div>
+        <div class="member-name">LINH</div>
+        <div class="member-role">Team Leader</div>
+        <span class="member-dept">IBT</span>
+      </div>
+      <div class="member-card reveal member-you" style="transition-delay:0.10s">
+        <div class="member-avatar" style="background:linear-gradient(135deg,var(--cyan-dim),#001a22);border-color:var(--cyan);">K</div>
+        <div class="member-name">KUDRATKHON</div>
+        <div class="member-role">3D Cover Design</div>
+        <span class="member-dept">ISE · YOU</span>
+      </div>
+      <div class="member-card reveal" style="transition-delay:0.15s">
+        <div class="member-avatar">B</div>
+        <div class="member-name">BAHODIR</div>
+        <div class="member-role">Full-Stack Dev</div>
+        <span class="member-dept">ISE</span>
+      </div>
+      <div class="member-card reveal" style="transition-delay:0.20s">
+        <div class="member-avatar">S</div>
+        <div class="member-name">SHUKURULLO</div>
+        <div class="member-role">Technical Lead</div>
+        <span class="member-dept">ISE</span>
+      </div>
+      <div class="member-card reveal" style="transition-delay:0.25s">
+        <div class="member-avatar">M</div>
+        <div class="member-name">MUBINA</div>
+        <div class="member-role">Business Strategy</div>
+        <span class="member-dept">IBT</span>
+      </div>
+      <div class="member-card reveal" style="transition-delay:0.30s">
+        <div class="member-avatar">S</div>
+        <div class="member-name">SHAKHRIZODA</div>
+        <div class="member-role">Business Plan</div>
+        <span class="member-dept">IBT</span>
+      </div>
+      <div class="member-card reveal" style="transition-delay:0.35s">
+        <div class="member-avatar">T</div>
+        <div class="member-name">TEMURBEK</div>
+        <div class="member-role">Market Analysis</div>
+        <span class="member-dept">IBT</span>
+      </div>
+      <div class="member-card reveal" style="transition-delay:0.40s">
+        <div class="member-avatar">S</div>
+        <div class="member-name">SHAMSIDDIN</div>
+        <div class="member-role">Business Plan</div>
+        <span class="member-dept">IBT</span>
+      </div>
+    </div>
+
+    <!-- Professors -->
+    <div style="margin-top:4rem; padding-top:3rem; border-top:1px solid rgba(0,229,255,0.1);">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:4px;color:var(--text-dim);margin-bottom:2rem;">FACULTY ADVISORS</div>
+      <div style="display:flex;gap:2rem;flex-wrap:wrap;">
+        <div style="background:var(--panel);border:1px solid rgba(0,229,255,0.1);padding:1.5rem 2rem;flex:1;min-width:220px;">
+          <div style="font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:#fff;margin-bottom:0.3rem;">PROF. VICTORIA KIM</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--cyan);">Ph.D. · IBT DEPARTMENT</div>
+        </div>
+        <div style="background:var(--panel);border:1px solid rgba(0,229,255,0.1);padding:1.5rem 2rem;flex:1;min-width:220px;">
+          <div style="font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:#fff;margin-bottom:0.3rem;">PROF. MEHDI PIRAHANDEH</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--cyan);">Ph.D. · ISE DEPARTMENT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TIMELINE -->
+<section id="timeline">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">05 &nbsp;—&nbsp; TIMELINE</div>
+      <h2 class="section-title">Project Progress</h2>
+    </div>
+
+    <div class="timeline" style="margin-top:4rem;">
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-date">WEEK 1–2 · JAN 2026</div>
+        <div class="tl-title">Project Kickoff & Ideation</div>
+        <div class="tl-desc">Team formation and concept development. Defined the product as an autonomous night-patrol welfare robot. Chose YOLO26n as the core fall-detection model.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-date">WEEK 3–4 · FEB 2026</div>
+        <div class="tl-title">Product Specification & Market Analysis</div>
+        <div class="tl-desc">Completed Business Worksheet 1 & 2. Defined personas, product specs, TAM/SAM/SOM market analysis. Hardware stack finalized: Yahboom Pi 4WD + Raspberry Pi 4.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-date">WEEK 5–6 · MAR 2026</div>
+        <div class="tl-title">Software Development & Hardware Integration</div>
+        <div class="tl-desc">Engineering team completed core software: white-line navigation with obstacle avoidance, YOLO26n fall detection, and the bilingual LiveKit voice agent — all integrated on the Raspberry Pi.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-date">APRIL 2026</div>
+        <div class="tl-title">Cover Design & Bi-Weekly Review</div>
+        <div class="tl-desc">Started Fusion 360 3D cover design. Bi-weekly progress review held at Jungseok Library. STL files for F_Upper and F_Lower finalized. QUANTUM GUARD engraving added.</div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-date">MAY 2026</div>
+        <div class="tl-title">Cover Fabrication & Final Assembly</div>
+        <div class="tl-desc">Autonomous 119 emergency call and the real-time mission-control dashboard completed. 3D-printed shell fabricated, full robot assembled, and final testing for the capstone presentation.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">NIGHT OFFICER</div>
+  <div class="footer-sub">QUANTUM GUARD · TEAM 2 · INHA UNIVERSITY · 2026</div>
+  <ul class="footer-links">
+    <li><a href="#hero">Home</a></li>
+    <li><a href="#about">About</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#specs">Specs</a></li>
+    <li><a href="#team">Team</a></li>
+    <li><a href="#timeline">Timeline</a></li>
+  </ul>
+  <div class="footer-copy">© 2026 QUANTUM GUARD · CAPSTONE DESIGN · ISE / IBT DEPARTMENTS · INHA UNIVERSITY</div>
+</footer>
+
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.reveal, .tl-item').forEach(el => observer.observe(el));
+
+// Nav active state
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav-links a');
+
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => {
+    if (window.scrollY >= s.offsetTop - 100) current = s.id;
+  });
+  navLinks.forEach(a => {
+    a.style.color = a.getAttribute('href') === '#'+current
+      ? 'var(--cyan)' : '';
+  });
+});
+
+// Cursor trail effect (subtle)
+const canvas = document.createElement('canvas');
+canvas.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:9997;opacity:0.4;';
+document.body.appendChild(canvas);
+const ctx2 = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let mouse = {x:0,y:0};
+let trail = [];
+
+window.addEventListener('mousemove', e => {
+  mouse.x = e.clientX; mouse.y = e.clientY;
+  trail.push({x:mouse.x, y:mouse.y, life:1.0});
+  if (trail.length > 12) trail.shift();
+});
+
+window.addEventListener('resize', () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+function animTrail() {
+  ctx2.clearRect(0,0,canvas.width,canvas.height);
+  trail.forEach((p,i) => {
+    p.life -= 0.08;
+    if (p.life <= 0) return;
+    const a = p.life * 0.5;
+    ctx2.beginPath();
+    ctx2.arc(p.x, p.y, 3*(i/trail.length), 0, Math.PI*2);
+    ctx2.fillStyle = `rgba(0,229,255,${a})`;
+    ctx2.fill();
+  });
+  trail = trail.filter(p => p.life > 0);
+  requestAnimationFrame(animTrail);
+}
+animTrail();
+</script>
+</body>
+</html>

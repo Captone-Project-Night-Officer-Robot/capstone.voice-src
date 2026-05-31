@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Night Officer — Robot Map</title>
+  <style>
+    :root {
+      --bg: #0e1014;
+      --panel: #161a21;
+      --grid: #1e2530;
+      --ink: #e8eef5;
+      --muted: #8a96a6;
+      --ok: #4caf6f;
+      --warn: #f0b232;
+      --bad: #e2495a;
+      --voice: #5aa7ff;
+      --search: #f0b232;
+      --obstacle: #c97a3a;
+      --follow: #4caf6f;
+      --fall: #e2495a;
+      --verify: #b16dff;
+      --resuming: #6a7686;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink);
+      font: 14px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+    .app { display: grid; grid-template-columns: 1fr 320px; height: 100vh; }
+    canvas { display: block; width: 100%; height: 100%; background: var(--bg); }
+    .side { background: var(--panel); border-left: 1px solid #222; padding: 16px;
+      display: flex; flex-direction: column; gap: 16px; overflow: auto; }
+    h1 { font-size: 15px; margin: 0; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--muted); }
+    .stat { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+    .stat span:first-child { color: var(--muted); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .pill-follow   { background: rgba(76,175,111,.18);  color: var(--follow); }
+    .pill-search   { background: rgba(240,178,50,.18);  color: var(--search); }
+    .pill-obstacle { background: rgba(201,122,58,.20);  color: var(--obstacle); }
+    .pill-verify   { background: rgba(177,109,255,.20); color: var(--verify); }
+    .pill-fall     { background: rgba(226,73,90,.18);   color: var(--fall); }
+    .pill-voice    { background: rgba(90,167,255,.18);  color: var(--voice); }
+    .pill-resuming { background: rgba(106,118,134,.20); color: var(--resuming); }
+    .pill-init,
+    .pill-idle     { background: #2a313c; color: var(--muted); }
+    .conn { display: inline-block; width: 8px; height: 8px; border-radius: 999px;
+      background: var(--bad); margin-right: 6px; vertical-align: middle; }
+    .conn.ok { background: var(--ok); }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .btn { background: #232a36; border: 1px solid #2c3543; color: var(--ink);
+      padding: 6px 10px; border-radius: 6px; cursor: pointer; font: inherit; }
+    .btn:hover { background: #2b3340; }
+    .legend { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+    .legend i { display: inline-block; width: 12px; height: 4px; vertical-align: middle;
+      margin-right: 6px; border-radius: 2px; }
+    .fall-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px;
+      overflow: auto; }
+    .fall-row { display: flex; justify-content: space-between; font-size: 12px;
+      padding: 6px 8px; background: rgba(226,73,90,.07); border-left: 3px solid var(--fall);
+      border-radius: 3px; font-variant-numeric: tabular-nums; }
+    .fall-row .when { color: var(--muted); }
+    .empty { color: var(--muted); font-style: italic; font-size: 12px; }
+
+    /* Live logs panel */
+    .logs {
+      background: #0a0c10; border: 1px solid #1c2230; border-radius: 6px;
+      max-height: 260px; overflow: auto; padding: 6px 8px;
+      font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .logs.empty-state { color: var(--muted); font-style: italic; }
+    .log-row { display: grid; grid-template-columns: 56px 54px 60px 1fr; gap: 6px;
+      padding: 1px 0; }
+    .log-row .ts   { color: var(--muted); }
+    .log-row .lvl  { font-weight: 700; }
+    .log-row .src  { color: var(--muted); }
+    .log-row .msg  { white-space: pre-wrap; word-break: break-word; }
+    .lvl-DEBUG    { color: #6a7686; }
+    .lvl-INFO     { color: var(--follow); }
+    .lvl-WARNING  { color: var(--search); }
+    .lvl-ERROR,
+    .lvl-CRITICAL { color: var(--bad); }
+    .logs-toolbar { display: flex; justify-content: space-between;
+      align-items: center; gap: 8px; }
+    .logs-toolbar select { background: #232a36; color: var(--ink);
+      border: 1px solid #2c3543; border-radius: 4px; font: inherit; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <canvas id="map"></canvas>
+    <aside class="side">
+      <div>
+        <h1>Night Officer</h1>
+        <div class="row" style="margin-top:6px;">
+          <span><span id="dot" class="conn"></span><span id="conn">connecting…</span></span>
+          <button class="btn" id="reset">reset</button>
+        </div>
+      </div>
+
+      <div>
+        <h1>Robot</h1>
+        <div class="stat"><span>id</span><span id="robot-id">—</span></div>
+        <div class="stat"><span>state</span><span id="state" class="pill pill-init">init</span></div>
+        <div class="stat"><span>pose</span><span id="pose">—</span></div>
+        <div class="stat"><span>heading</span><span id="heading">—</span></div>
+        <div class="stat"><span>path pts</span><span id="path-pts">0</span></div>
+        <div class="stat"><span>falls</span><span id="fall-count">0</span></div>
+      </div>
+
+      <div>
+        <h1>Cameras / YOLO</h1>
+        <div class="stat"><span>main loop fps</span><span id="m-main-fps">—</span></div>
+        <div class="stat"><span>fall cam fps</span><span id="m-fall-fps">—</span></div>
+        <div class="stat"><span>infer latency</span><span id="m-infer-ms">—</span></div>
+        <div class="stat"><span>people in frame</span><span id="m-people">—</span></div>
+        <div class="stat"><span>falling ids</span><span id="m-falling-ids">—</span></div>
+      </div>
+
+      <div>
+        <h1>Falls detected</h1>
+        <div class="fall-list" id="fall-list">
+          <div class="empty">No falls yet.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="logs-toolbar">
+          <h1 style="margin:0;">Live Logs</h1>
+          <span>
+            <select id="log-level">
+              <option value="DEBUG">all</option>
+              <option value="INFO" selected>info+</option>
+              <option value="WARNING">warn+</option>
+              <option value="ERROR">errors</option>
+            </select>
+            <button class="btn" id="log-clear" style="padding:2px 8px;">clear</button>
+          </span>
+        </div>
+        <div class="logs empty-state" id="log-list">No logs yet.</div>
+      </div>
+
+      <div>
+        <h1>Legend</h1>
+        <div class="legend">
+          <div><i style="background: var(--follow)"></i>follow (driving line)</div>
+          <div><i style="background: var(--search)"></i>search (looking for line)</div>
+          <div><i style="background: var(--obstacle)"></i>obstacle (turning)</div>
+          <div><i style="background: var(--verify)"></i>verify (checking fall)</div>
+          <div><i style="background: var(--fall)"></i>fall (confirmed)</div>
+          <div><i style="background: var(--voice)"></i>voice (talking)</div>
+          <div><i style="background: var(--resuming)"></i>resuming (post-voice pause)</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ── state ───────────────────────────────────────────────────────────────
+    const robots = {};   // robot_id -> { path, falls, last_pose }
+    let activeRobot = null;
+
+    const cv = document.getElementById("map");
+    const ctx = cv.getContext("2d");
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      cv.width  = cv.clientWidth  * dpr;
+      cv.height = cv.clientHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    const STATE_COLORS = {
+      follow:   getCss("--follow"),
+      search:   getCss("--search"),
+      obstacle: getCss("--obstacle"),
+      verify:   getCss("--verify"),
+      fall:     getCss("--fall"),
+      voice:    getCss("--voice"),
+      resuming: getCss("--resuming"),
+      init:     "#5a6373",
+    };
+    function getCss(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    // ── drawing ─────────────────────────────────────────────────────────────
+    function fitView(points) {
+      if (points.length === 0) {
+        return { ox: cv.clientWidth/2, oy: cv.clientHeight/2, s: 80 };
+      }
+      let minX = +Infinity, maxX = -Infinity, minY = +Infinity, maxY = -Infinity;
+      for (const p of points) {
+        if (p.x < minX) minX = p.x;  if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;  if (p.y > maxY) maxY = p.y;
+      }
+      const margin = 1.0; // meters of padding around the path
+      minX -= margin; maxX += margin; minY -= margin; maxY += margin;
+      const w = cv.clientWidth, h = cv.clientHeight;
+      // World y → screen y is flipped (robot y left = screen up).
+      const sx = w / Math.max(0.5, (maxX - minX));
+      const sy = h / Math.max(0.5, (maxY - minY));
+      const s  = Math.min(sx, sy);
+      const ox = (w - s * (maxX + minX)) / 2;
+      const oy = (h + s * (maxY + minY)) / 2;
+      return { ox, oy, s };
+    }
+
+    function worldToScreen(t, x, y) {
+      // y axis flipped so +y (robot's left) goes UP on screen.
+      return { px: t.ox + t.s * x, py: t.oy - t.s * y };
+    }
+
+    function drawGrid(t) {
+      const step = 0.5; // meters per gridline
+      const w = cv.clientWidth, h = cv.clientHeight;
+      ctx.strokeStyle = getCss("--grid");
+      ctx.lineWidth = 1;
+      // Vertical lines
+      const startX = Math.floor((-t.ox) / (t.s * step)) * step;
+      for (let x = startX; ; x += step) {
+        const { px } = worldToScreen(t, x, 0);
+        if (px > w + 1) break;
+        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+      }
+      // Horizontal lines
+      const startY = Math.floor((t.oy - h) / (t.s * step)) * step;
+      for (let y = startY; ; y += step) {
+        const { py } = worldToScreen(t, 0, y);
+        if (py < -1) break;
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
+      }
+      // Origin cross
+      const o = worldToScreen(t, 0, 0);
+      ctx.strokeStyle = "#3a4554";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(o.px-8, o.py); ctx.lineTo(o.px+8, o.py);
+      ctx.moveTo(o.px, o.py-8); ctx.lineTo(o.px, o.py+8); ctx.stroke();
+    }
+
+    function drawPath(t, path) {
+      if (path.length < 2) return;
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      // Draw segment-by-segment so each colors by its state.
+      for (let i = 1; i < path.length; i++) {
+        const a = worldToScreen(t, path[i-1].x, path[i-1].y);
+        const b = worldToScreen(t, path[i].x, path[i].y);
+        ctx.strokeStyle = STATE_COLORS[path[i].state] || STATE_COLORS.init;
+        ctx.beginPath(); ctx.moveTo(a.px, a.py); ctx.lineTo(b.px, b.py); ctx.stroke();
+      }
+    }
+
+    function drawFalls(t, falls) {
+      for (const f of falls) {
+        const p = worldToScreen(t, f.x, f.y);
+        // Halo
+        ctx.fillStyle = "rgba(226,73,90,0.18)";
+        ctx.beginPath(); ctx.arc(p.px, p.py, 16, 0, Math.PI*2); ctx.fill();
+        // Dot
+        ctx.fillStyle = getCss("--fall");
+        ctx.beginPath(); ctx.arc(p.px, p.py, 6, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+
+    function drawRobot(t, pose) {
+      if (!pose) return;
+      const p = worldToScreen(t, pose.x, pose.y);
+      const r = 10;
+      // Screen-y is flipped so we negate the heading angle as well.
+      const a = -pose.theta;
+      ctx.save();
+      ctx.translate(p.px, p.py);
+      ctx.rotate(a);
+      ctx.fillStyle = STATE_COLORS[pose.state] || "#fff";
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.lineTo(-r*0.75, r*0.7);
+      ctx.lineTo(-r*0.4, 0);
+      ctx.lineTo(-r*0.75, -r*0.7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#0e1014";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function render() {
+      ctx.fillStyle = getCss("--bg");
+      ctx.fillRect(0, 0, cv.clientWidth, cv.clientHeight);
+
+      const r = robots[activeRobot];
+      const path = r?.path || [];
+      const falls = r?.falls || [];
+      const last = r?.last_pose || null;
+
+      // Fit view to bbox of path + falls + current pose.
+      const fitPoints = [];
+      for (const p of path) fitPoints.push(p);
+      for (const f of falls) fitPoints.push(f);
+      if (last) fitPoints.push(last);
+      const t = fitView(fitPoints);
+
+      drawGrid(t);
+      drawPath(t, path);
+      drawFalls(t, falls);
+      drawRobot(t, last);
+
+      updateSidebar(r);
+    }
+
+    // ── sidebar ─────────────────────────────────────────────────────────────
+    function updateSidebar(r) {
+      document.getElementById("robot-id").textContent = activeRobot || "—";
+
+      const stateEl = document.getElementById("state");
+      const state = r?.last_pose?.state || "init";
+      stateEl.textContent = state;
+      stateEl.className = "pill pill-" + state;
+
+      const pose = r?.last_pose;
+      document.getElementById("pose").textContent =
+        pose ? `${pose.x.toFixed(2)}, ${pose.y.toFixed(2)} m` : "—";
+      document.getElementById("heading").textContent =
+        pose ? `${(pose.theta * 180 / Math.PI).toFixed(0)}°` : "—";
+
+      document.getElementById("path-pts").textContent = (r?.path || []).length;
+      document.getElementById("fall-count").textContent = (r?.falls || []).length;
+
+      const m = r?.metrics || {};
+      document.getElementById("m-main-fps").textContent =
+        m.main_fps != null ? `${m.main_fps.toFixed(1)} fps` : "—";
+      document.getElementById("m-fall-fps").textContent =
+        m.fall_fps != null ? `${m.fall_fps.toFixed(1)} fps` : "—";
+      document.getElementById("m-infer-ms").textContent =
+        m.fall_infer_ms != null ? `${m.fall_infer_ms.toFixed(0)} ms` : "—";
+      document.getElementById("m-people").textContent =
+        m.people != null ? m.people : "—";
+      const ids = Array.isArray(m.tracked_falling_ids) ? m.tracked_falling_ids : [];
+      document.getElementById("m-falling-ids").textContent =
+        ids.length ? ids.map(i => `#${i}`).join(" ") : "—";
+
+      const list = document.getElementById("fall-list");
+      const falls = r?.falls || [];
+      if (falls.length === 0) {
+        list.innerHTML = '<div class="empty">No falls yet.</div>';
+      } else {
+        list.innerHTML = "";
+        for (let i = falls.length - 1; i >= 0; i--) {
+          const f = falls[i];
+          const row = document.createElement("div");
+          row.className = "fall-row";
+          const tag = f.track_id != null ? `track #${f.track_id}` : `pin #${i+1}`;
+          row.innerHTML = `<span>${tag} (${f.x.toFixed(2)}, ${f.y.toFixed(2)})</span>
+                           <span class="when">${timeAgo(f.ts)}</span>`;
+          list.appendChild(row);
+        }
+      }
+    }
+
+    function timeAgo(ts) {
+      const sec = Math.max(0, Math.round(Date.now()/1000 - ts));
+      if (sec < 60) return sec + "s ago";
+      if (sec < 3600) return Math.round(sec/60) + "m ago";
+      return Math.round(sec/3600) + "h ago";
+    }
+
+    // ── WebSocket ───────────────────────────────────────────────────────────
+    function pickActive() {
+      if (activeRobot && robots[activeRobot]) return;
+      const ids = Object.keys(robots);
+      activeRobot = ids[0] || null;
+    }
+
+    function applySnapshot(snap) {
+      for (const [rid, data] of Object.entries(snap.robots || {})) {
+        robots[rid] = {
+          path: data.path || [],
+          falls: data.falls || [],
+          last_pose: data.last_pose || null,
+          metrics: data.metrics || {},
+        };
+      }
+      pickActive();
+      if (Array.isArray(snap.logs)) {
+        for (const e of snap.logs) appendLog(e);
+      }
+    }
+
+    function applyPose(msg) {
+      const r = robots[msg.robot_id] ||=
+        { path: [], falls: [], last_pose: null, metrics: {} };
+      r.last_pose = {
+        x: msg.x, y: msg.y, theta: msg.theta, state: msg.state, ts: msg.ts,
+      };
+      if (msg.metrics) r.metrics = msg.metrics;
+      if (msg.appended) {
+        r.path.push({ x: msg.x, y: msg.y, state: msg.state, ts: msg.ts });
+      }
+      if (!activeRobot) activeRobot = msg.robot_id;
+    }
+
+    function applyFall(msg) {
+      const r = robots[msg.robot_id] ||=
+        { path: [], falls: [], last_pose: null, metrics: {} };
+      r.falls.push({
+        x: msg.x, y: msg.y, ts: msg.ts, track_id: msg.track_id ?? null,
+      });
+    }
+
+    function applyReset(msg) {
+      if (!msg.robot_id) {
+        for (const k of Object.keys(robots)) delete robots[k];
+        activeRobot = null;
+      } else {
+        delete robots[msg.robot_id];
+        if (activeRobot === msg.robot_id) activeRobot = null;
+        pickActive();
+      }
+    }
+
+    let ws = null;
+    function connect() {
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const url = `${proto}://${location.host}/api/v1/telemetry/ws`;
+      ws = new WebSocket(url);
+      ws.onopen = () => {
+        document.getElementById("dot").classList.add("ok");
+        document.getElementById("conn").textContent = "connected";
+      };
+      ws.onclose = () => {
+        document.getElementById("dot").classList.remove("ok");
+        document.getElementById("conn").textContent = "reconnecting…";
+        setTimeout(connect, 1500);
+      };
+      ws.onerror = () => { try { ws.close(); } catch {} };
+      ws.onmessage = (ev) => {
+        let msg;
+        try { msg = JSON.parse(ev.data); } catch { return; }
+        switch (msg.type) {
+          case "snapshot": applySnapshot(msg); break;
+          case "pose":     applyPose(msg); break;
+          case "fall":     applyFall(msg); break;
+          case "reset":    applyReset(msg); break;
+          case "log":      appendLog(msg); break;
+          case "ping":     break;
+        }
+      };
+    }
+    connect();
+
+    // ── live logs ─────────────────────────────────────────────────────────
+    const LOG_MAX = 300;
+    const logEntries = [];      // raw entries; UI filters by level on render
+    const LEVEL_RANK = {
+      DEBUG: 10, INFO: 20, WARNING: 30, ERROR: 40, CRITICAL: 40,
+    };
+    function appendLog(e) {
+      const entry = {
+        ts: e.ts || (Date.now() / 1000),
+        level: (e.level || "INFO").toUpperCase(),
+        source: e.source || "?",
+        message: e.message || "",
+      };
+      logEntries.push(entry);
+      if (logEntries.length > LOG_MAX) logEntries.shift();
+      renderLogs();
+    }
+    function renderLogs() {
+      const min = LEVEL_RANK[document.getElementById("log-level").value] || 0;
+      const el = document.getElementById("log-list");
+      const filtered = logEntries.filter(
+        e => (LEVEL_RANK[e.level] || 0) >= min
+      );
+      if (filtered.length === 0) {
+        el.classList.add("empty-state");
+        el.textContent = "No logs at this level.";
+        return;
+      }
+      el.classList.remove("empty-state");
+      const wasPinned =
+        el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+      el.innerHTML = "";
+      for (const e of filtered) {
+        const d = new Date(e.ts * 1000);
+        const ts =
+          String(d.getHours()).padStart(2, "0") + ":" +
+          String(d.getMinutes()).padStart(2, "0") + ":" +
+          String(d.getSeconds()).padStart(2, "0");
+        const row = document.createElement("div");
+        row.className = "log-row";
+        const src = e.source.length > 7 ? e.source.slice(0, 7) : e.source;
+        row.innerHTML = `
+          <span class="ts">${ts}</span>
+          <span class="lvl lvl-${e.level}">${e.level.slice(0,5)}</span>
+          <span class="src">${src}</span>
+          <span class="msg"></span>`;
+        row.querySelector(".msg").textContent = e.message;
+        el.appendChild(row);
+      }
+      if (wasPinned) el.scrollTop = el.scrollHeight;
+    }
+    document.getElementById("log-level").addEventListener("change", renderLogs);
+    document.getElementById("log-clear").addEventListener("click", () => {
+      logEntries.length = 0;
+      renderLogs();
+    });
+
+    // Render at 30 fps. Cheap — the canvas is small.
+    setInterval(render, 33);
+
+    // Reset button → wipes server-side state for the active robot.
+    document.getElementById("reset").addEventListener("click", async () => {
+      if (!activeRobot) {
+        await fetch("/api/v1/telemetry/reset", { method: "POST" });
+      } else {
+        await fetch("/api/v1/telemetry/reset?robot_id=" + encodeURIComponent(activeRobot),
+          { method: "POST" });
+      }
+    });
+  </script>
+</body>
+</html>
