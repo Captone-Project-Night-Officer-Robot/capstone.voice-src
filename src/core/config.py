@@ -68,5 +68,23 @@ class Settings(BaseSettings):
             and self.emergency_phone_number
         )
 
+    # ── Emergency outbound call (LiveKit SIP → Twilio trunk) ──────────────────
+    # After the NightOfficer conversation ends, a second agent places a real
+    # phone call to the emergency contact and reports the patient record.
+    # Needs the LiveKit outbound trunk id from scripts/create_sip_trunk.py.
+    livekit_sip_outbound_trunk_id: str = Field(
+        default="", alias="LIVEKIT_SIP_OUTBOUND_TRUNK_ID"
+    )
+    emergency_call_enabled: bool = Field(default=True, alias="EMERGENCY_CALL_ENABLED")
+
+    @property
+    def emergency_call_ready(self) -> bool:
+        """True when an outbound emergency call can actually be placed."""
+        return bool(
+            self.emergency_call_enabled
+            and self.livekit_sip_outbound_trunk_id
+            and self.emergency_phone_number
+        )
+
 
 settings = Settings()

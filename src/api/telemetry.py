@@ -23,7 +23,14 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from src.core.logging import logger
-from src.models.telemetry import FallEvent, LogEvent, PoseUpdate
+from src.models.telemetry import (
+    CallEvent,
+    FallEvent,
+    LogEvent,
+    PatientEvent,
+    PoseUpdate,
+    TranscriptEvent,
+)
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry"])
 
@@ -42,6 +49,13 @@ _falls: dict[str, list[dict]] = {}
 _last_pose: dict[str, dict] = {}
 _last_metrics: dict[str, dict] = {}
 
+# Live voice conversation transcript (per robot/room), latest patient record,
+# and latest emergency-call status — all surfaced on the /app dashboard.
+_MAX_TRANSCRIPT = 100
+_transcript: dict[str, list[dict]] = {}
+_patient: dict[str, dict] = {}
+_call: dict[str, dict] = {}
+
 # Ring buffer of recent log entries (API + worker + Pi). The dashboard
 # replays this on connect so a freshly-opened tab isn't blank.
 _LOG_BUFFER_MAX = 300
@@ -58,13 +72,19 @@ _subscribers: set[WebSocket] = set()
 
 def _snapshot() -> dict[str, Any]:
     robots: dict[str, Any] = {}
-    keys = set(_path) | set(_falls) | set(_last_pose) | set(_last_metrics)
+    keys = (
+        set(_path) | set(_falls) | set(_last_pose) | set(_last_metrics)
+        | set(_transcript) | set(_patient) | set(_call)
+    )
     for robot_id in keys:
         robots[robot_id] = {
             "path": _path.get(robot_id, []),
             "falls": _falls.get(robot_id, []),
             "last_pose": _last_pose.get(robot_id),
             "metrics": _last_metrics.get(robot_id, {}),
+            "transcript": _transcript.get(robot_id, []),
+            "patient": _patient.get(robot_id),
+            "call": _call.get(robot_id),
         }
     return {"robots": robots, "logs": list(_log_buffer)}
 
@@ -193,6 +213,47 @@ async def post_log(event: LogEvent) -> dict:
     return {"ok": True}
 
 
+@router.post("/transcript", summary="Voice conversation line (STT/TTS)")
+async def post_transcript(event: TranscriptEvent) -> dict:
+    line = {
+        "role": event.role,
+        "text": event.text,
+        "final": event.final,
+        "ts": event.ts or time.time(),
+    }
+    # Interim (non-final) lines update in place on the client; we only persist
+    # final lines in the replay buffer.
+    if event.final:
+        buf = _transcript.setdefault(event.robot_id, [])
+        buf.append(line)
+        if len(buf) > _MAX_TRANSCRIPT:
+            del buf[: len(buf) - _MAX_TRANSCRIPT]
+    await _broadcast({"type": "transcript", "robot_id": event.robot_id, **line})
+    return {"ok": True}
+
+
+@router.post("/patient", summary="Collected patient record")
+async def post_patient(event: PatientEvent) -> dict:
+    record = event.model_dump()
+    record["ts"] = record.get("ts") or time.time()
+    _patient[event.robot_id] = record
+    await _broadcast({"type": "patient", **record})
+    return {"ok": True}
+
+
+@router.post("/call", summary="Emergency call status")
+async def post_call(event: CallEvent) -> dict:
+    status = event.model_dump()
+    status["ts"] = status.get("ts") or time.time()
+    _call[event.robot_id] = status
+    logger.info(
+        f"Emergency call status robot_id={event.robot_id} "
+        f"status={event.status} to={event.to}"
+    )
+    await _broadcast({"type": "call", **status})
+    return {"ok": True}
+
+
 @router.post("/reset", summary="Clear stored telemetry")
 async def reset(robot_id: str | None = None) -> dict:
     if robot_id is None:
@@ -200,12 +261,18 @@ async def reset(robot_id: str | None = None) -> dict:
         _falls.clear()
         _last_pose.clear()
         _last_metrics.clear()
+        _transcript.clear()
+        _patient.clear()
+        _call.clear()
         _log_buffer.clear()
     else:
         _path.pop(robot_id, None)
         _falls.pop(robot_id, None)
         _last_pose.pop(robot_id, None)
         _last_metrics.pop(robot_id, None)
+        _transcript.pop(robot_id, None)
+        _patient.pop(robot_id, None)
+        _call.pop(robot_id, None)
     await _broadcast({"type": "reset", "robot_id": robot_id})
     return {"ok": True}
 

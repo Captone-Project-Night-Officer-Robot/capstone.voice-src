@@ -7,7 +7,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api import api_router
@@ -73,9 +73,21 @@ async def dashboard() -> FileResponse:
     return FileResponse(_STATIC_DIR / "dashboard.html")
 
 
+# ── Real-time mission-control app (React SPA, built to static/app) ────────────
+# Build it with: cd frontend && npm install && npm run build
+# Then it's served here at /app. html=True makes the mount serve index.html.
+_APP_DIR = _STATIC_DIR / "app"
+if _APP_DIR.is_dir():
+    app.mount("/app", StaticFiles(directory=_APP_DIR, html=True), name="app")
+
+
 @app.get("/", include_in_schema=False)
-async def root() -> RedirectResponse:
-    return RedirectResponse(url="/dashboard")
+async def root() -> FileResponse:
+    # Marketing landing page. Its nav + hero link to /app (live dashboard).
+    landing = _STATIC_DIR / "landing.html"
+    if landing.is_file():
+        return FileResponse(landing)
+    return FileResponse(_STATIC_DIR / "dashboard.html")
 
 
 def run() -> None:

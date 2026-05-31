@@ -94,6 +94,15 @@ LiveKit worker
 
 ---
 
+## Real-time web app (Mission Control) — `/app`
+
+The full live view is the React app at **`/app`**: video feeds, map, live
+voice transcript, emergency-call status, patient record, telemetry, and the
+merged log feed — all on one page, fed by the telemetry WebSocket. Build it
+once with `cd frontend && npm install && npm run build`, then open
+`http://<laptop-ip>:8001/app`. See `frontend/README.md` for details. The
+minimal map below stays at `/dashboard`.
+
 ## Map dashboard + live logs
 
 A second feature lives next to the voice agent — a live operator map at

@@ -38,3 +38,37 @@ class LogEvent(BaseModel):
     message: str
     ts: float
     function: str = ""
+
+
+class TranscriptEvent(BaseModel):
+    robot_id: str = Field(..., description="Robot / room identifier")
+    role: str = Field(..., description="'agent' | 'patient' | 'dispatch' | 'contact'")
+    text: str
+    final: bool = Field(default=True, description="False = interim STT, True = final")
+    ts: float = Field(default=0.0)
+
+
+class PatientEvent(BaseModel):
+    robot_id: str
+    patient_name: str = ""
+    situation: str = ""
+    pain_location: str = ""
+    temperature: str = ""
+    medical_conditions: str = ""
+    medications: str = ""
+    allergies: str = ""
+    alcohol_consumed: str = ""
+    notes: str = ""
+    ts: float = Field(default=0.0)
+
+
+class CallEvent(BaseModel):
+    robot_id: str
+    status: str = Field(
+        ...,
+        description="placing | ringing | active | ended | failed",
+    )
+    to: str = Field(default="", description="Destination phone number")
+    room_name: str = ""
+    detail: str = ""
+    ts: float = Field(default=0.0)
